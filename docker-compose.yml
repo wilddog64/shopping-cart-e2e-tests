@@ -1,0 +1,122 @@
+version: '3.8'
+
+# Docker Compose for E2E Test Environment
+# This sets up all services needed for running end-to-end tests locally
+
+services:
+  # Product Catalog Service (Python/FastAPI)
+  product-catalog:
+    image: shopping-cart/product-catalog:latest
+    build:
+      context: ../shopping-cart-product-catalog
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/products
+      - OAUTH2_ENABLED=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Basket Service (Go/Gin)
+  basket:
+    image: shopping-cart/basket:latest
+    build:
+      context: ../shopping-cart-basket
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=testredis123
+      - OAUTH2_ENABLED=false
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Order Service (Java/Spring Boot)
+  order:
+    image: shopping-cart/order:latest
+    build:
+      context: ../shopping-cart-order
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/orders
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - OAUTH2_ENABLED=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_MULTIPLE_DATABASES=products,orders
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Basket Service
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass testredis123
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "testredis123", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Optional: Keycloak for OAuth2 testing
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    ports:
+      - "8180:8080"
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_DB=dev-mem
+    command: start-dev
+    profiles:
+      - oauth2
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  default:
+    name: shopping-cart-e2e
