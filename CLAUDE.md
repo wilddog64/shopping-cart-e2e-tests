@@ -19,6 +19,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 | Product Catalog | Python/FastAPI | 8000 | GET /health |
 | Basket | Go/Gin | 8083 | GET /health |
 | Order | Java/Spring Boot | 8080 | GET /actuator/health |
+| Payment | Java/Spring Boot | 8084 | GET /actuator/health |
 | Frontend | React/Vite | 3000 | N/A |
 
 ## Repository Structure

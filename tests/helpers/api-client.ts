@@ -5,6 +5,7 @@ export const config = {
   productCatalogUrl: process.env.PRODUCT_CATALOG_URL || 'http://localhost:8000',
   basketUrl: process.env.BASKET_URL || 'http://localhost:8083',
   orderUrl: process.env.ORDER_URL || 'http://localhost:8080',
+  paymentUrl: process.env.PAYMENT_URL || 'http://localhost:8084',
   testUserId: process.env.TEST_USER_ID || 'e2e-test-user',
 }
 
@@ -266,6 +267,113 @@ export class OrderClient {
     const response = await this.request.post(`${this.baseUrl}/api/orders/${orderId}/cancel`, {
       headers: this.getHeaders(),
       data: { reason: reason || 'E2E test cancellation' },
+    })
+    return response.json()
+  }
+
+  async checkHealth(): Promise<{ status: string }> {
+    const response = await this.request.get(`${this.baseUrl}/actuator/health`)
+    return response.json()
+  }
+}
+
+// Payment Types
+export type PaymentStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'REFUND_PENDING' | 'REFUNDED' | 'REFUND_FAILED'
+
+export interface ProcessPaymentRequest {
+  orderId: string
+  customerId: string
+  amount: number
+  currency: string
+  gateway?: string
+  paymentMethodId?: string
+  idempotencyKey?: string
+}
+
+export interface Payment {
+  id: string
+  orderId: string
+  customerId: string
+  amount: number
+  currency: string
+  status: PaymentStatus
+  gateway: string
+  gatewayTransactionId?: string
+  cardLast4?: string
+  cardBrand?: string
+  failureReason?: string
+  failureCode?: string
+  createdAt: string
+  processedAt?: string
+  completedAt?: string
+}
+
+export interface RefundRequest {
+  amount: number
+  reason?: string
+}
+
+export interface Refund {
+  id: string
+  paymentId: string
+  amount: number
+  currency: string
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+  reason?: string
+  gatewayRefundId?: string
+  createdAt: string
+  completedAt?: string
+}
+
+// Payment Client
+export class PaymentClient {
+  constructor(
+    private baseUrl: string,
+    private request: APIRequestContext,
+    private userId: string = config.testUserId
+  ) {}
+
+  private getHeaders() {
+    return {
+      'X-User-ID': this.userId,
+      'X-Correlation-ID': `e2e-${Date.now()}`,
+    }
+  }
+
+  async processPayment(data: ProcessPaymentRequest): Promise<Payment> {
+    const response = await this.request.post(`${this.baseUrl}/api/payments`, {
+      headers: this.getHeaders(),
+      data,
+    })
+    return response.json()
+  }
+
+  async getPayment(paymentId: string): Promise<Payment> {
+    const response = await this.request.get(`${this.baseUrl}/api/payments/${paymentId}`, {
+      headers: this.getHeaders(),
+    })
+    return response.json()
+  }
+
+  async getPaymentByOrderId(orderId: string): Promise<Payment | null> {
+    const response = await this.request.get(`${this.baseUrl}/api/payments?orderId=${orderId}`, {
+      headers: this.getHeaders(),
+    })
+    const payments = await response.json()
+    return payments.length > 0 ? payments[0] : null
+  }
+
+  async getPaymentsByCustomer(customerId: string): Promise<Payment[]> {
+    const response = await this.request.get(`${this.baseUrl}/api/payments?customerId=${customerId}`, {
+      headers: this.getHeaders(),
+    })
+    return response.json()
+  }
+
+  async refundPayment(paymentId: string, data: RefundRequest): Promise<Refund> {
+    const response = await this.request.post(`${this.baseUrl}/api/payments/${paymentId}/refund`, {
+      headers: this.getHeaders(),
+      data,
     })
     return response.json()
   }
