@@ -1,0 +1,170 @@
+# Project Rules
+
+## Tech Stack
+
+- **Framework**: Playwright (TypeScript) — API testing mode only (no browser automation for backend tests)
+- **Language**: TypeScript 5.x
+- **Node.js**: 18+
+- **Test Runner**: Playwright with two named projects: `api` and `flows`
+- **Linting/Formatting**: ESLint (typescript-eslint) + Prettier
+- **Env loading**: dotenv loaded in `playwright.config.ts`
+
+## Architecture
+
+This is a standalone test suite — no application source code. It tests the Shopping Cart microservices platform from the outside by making HTTP API calls.
+
+```
+tests/
+├── api/           # Direct API tests for individual services
+│   ├── products.spec.ts      # Product Catalog API (Python/FastAPI, port 8000)
+│   ├── cart.spec.ts          # Basket API (Go/Gin, port 8083)
+│   ├── orders.spec.ts        # Order API (Java/Spring Boot, port 8080)
+│   ├── payments.spec.ts      # Payment API (Java/Spring Boot, port 8084)
+│   └── cross-service.spec.ts # Data consistency across services
+├── flows/         # Multi-service integration flow tests
+│   ├── shopping-flow.spec.ts    # Browse → Add to Cart → Checkout → Order
+│   ├── checkout-flow.spec.ts    # Cart → Payment → Order confirmation
+│   ├── payment-flow.spec.ts     # Payment processing and refunds
+│   └── order-management.spec.ts # Order tracking and cancellation
+├── fixtures/
+│   └── test-data.ts   # Test data factories (products, addresses, etc.)
+└── helpers/
+    ├── api-client.ts  # Typed client classes for each service
+    ├── auth.ts        # OAuth2/Keycloak token management (with caching)
+    └── cleanup.ts     # Test data cleanup utilities
+```
+
+## Code Conventions
+
+- **Typed clients**: Every service has a dedicated class in `tests/helpers/api-client.ts` — never use `request.get/post` directly in test files
+- **Test isolation**: Each test must use a unique `testUserId` via `generateTestId()` to avoid collisions
+- **Cleanup**: Always register `test.afterEach` cleanup using `cleanupTestData(request, { userId: testUserId })`
+- **Skipping**: Use `test.skip()` when required test data is unavailable (e.g., not enough products), do not fail
+- **Imports**: Import client classes and helpers from relative paths; no `@/` alias in this project
+- **Auth headers**: Pass `userId` to client constructors; never hardcode `X-User-ID` inline in tests
+- **No magic strings**: Use `config` object from `api-client.ts` for all service URLs, not hardcoded localhost addresses
+
+### API client pattern
+```typescript
+// Instantiate per-test with unique userId
+const productClient = new ProductCatalogClient(config.productCatalogUrl, request)
+const basketClient = new BasketClient(config.basketUrl, request, testUserId)
+const orderClient = new OrderClient(config.orderUrl, request, testUserId)
+```
+
+### Flow test pattern
+```typescript
+test.describe('Flow Name', () => {
+  let testUserId: string
+
+  test.beforeEach(async ({ request }) => {
+    testUserId = generateTestId()
+    // initialize client instances
+  })
+
+  test.afterEach(async ({ request }) => {
+    await cleanupTestData(request, { userId: testUserId, cancelOrders: true })
+  })
+
+  test('description', async () => {
+    // multi-step cross-service test
+  })
+})
+```
+
+## Testing
+
+### Playwright Projects
+- **`api`** project: matches `api/**/*.spec.ts` — runs first
+- **`flows`** project: matches `flows/**/*.spec.ts` — depends on `api` project completing
+
+### Parallelism
+- Local: 4 workers
+- CI: 1 worker (sequential)
+
+### Timeouts
+- Default test timeout: 60 seconds
+- Default assertion timeout: 10 seconds
+- Override per-test if needed: `test.setTimeout(120000)`
+
+### Test data cleanup
+`cleanupTestData()` defaults: `clearCart: true`, `cancelOrders: false`
+Pass `cancelOrders: true` in flow tests that create orders.
+
+### Auth modes
+- `OAUTH2_ENABLED=false` (default): `X-User-ID` header used for user identification — no Keycloak needed
+- `OAUTH2_ENABLED=true`: Keycloak password grant used; tokens cached in module scope with 30s pre-expiry refresh
+
+## Build & Run
+
+```bash
+# Install
+make install        # npm install + playwright install
+
+# Run all tests
+make test           # playwright test (both projects)
+
+# Run by type
+make test-api       # API tests only (--project=api)
+make test-flows     # Flow tests only (--project=flows)
+
+# Debugging
+make test-debug     # --debug flag (step through)
+make test-headed    # --headed flag (visible browser)
+make test-report    # open HTML report
+
+# Setup environment
+cp .env.example .env
+# Edit .env with correct service URLs
+```
+
+### Running against Kubernetes
+Use the port-forward helper:
+```bash
+./bin/port-forward.sh    # Sets up kubectl port-forward for all services
+./bin/check-services.sh  # Verifies all services are healthy before running tests
+```
+
+### Required environment variables
+| Variable | Default | Description |
+|---|---|---|
+| `PRODUCT_CATALOG_URL` | `http://localhost:8000` | Product Catalog base URL |
+| `BASKET_URL` | `http://localhost:8083` | Basket service base URL |
+| `ORDER_URL` | `http://localhost:8080` | Order service base URL |
+| `PAYMENT_URL` | `http://localhost:8084` | Payment service base URL |
+| `FRONTEND_URL` | `http://localhost:3000` | Frontend base URL |
+| `TEST_USER_ID` | `e2e-test-user` | Default test user identifier |
+| `OAUTH2_ENABLED` | `false` | Enable JWT auth mode |
+
+## Key Patterns
+
+### Adding a new API test
+```typescript
+// tests/api/new-service.spec.ts
+import { test, expect } from '@playwright/test'
+import { SomeClient, config } from '../helpers/api-client'
+
+test.describe('New Service API', () => {
+  test('should do something', async ({ request }) => {
+    const client = new SomeClient(config.someUrl, request)
+    const result = await client.someMethod()
+    expect(result.status).toBe(200)
+  })
+})
+```
+
+### Adding a new typed client
+Add a class to `tests/helpers/api-client.ts` following the existing pattern:
+- Constructor takes `baseUrl: string`, `request: APIRequestContext`, optional `userId: string`
+- Private `getHeaders()` method returns auth headers
+- One method per API operation returning typed promises
+- Include `checkHealth()` method
+
+### Service health checks
+Before running tests, verify services:
+```bash
+curl $PRODUCT_CATALOG_URL/health          # FastAPI
+curl $BASKET_URL/health                   # Go/Gin
+curl $ORDER_URL/actuator/health           # Spring Boot
+curl $PAYMENT_URL/actuator/health         # Spring Boot
+```
