@@ -11,9 +11,9 @@ on:
         options:
           - staging
           - production
-  schedule:
-    # Run daily at 6 AM UTC
-    - cron: '0 6 * * *'
+  # schedule disabled — re-enable once ImagePullBackOff resolved and app cluster healthy
+  # schedule:
+  #   - cron: '0 6 * * *'
   push:
     branches:
       - main
