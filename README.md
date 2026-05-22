@@ -168,4 +168,4 @@ timeout: 120000,  // 2 minutes
 
 ## License
 
-MIT
+Apache 2.0 — see [LICENSE](LICENSE)
