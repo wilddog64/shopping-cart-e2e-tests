@@ -14,11 +14,12 @@ on:
   # schedule disabled — re-enable once ImagePullBackOff resolved and app cluster healthy
   # schedule:
   #   - cron: '0 6 * * *'
-  # push/pull_request disabled — tests require live services (basket:8083, catalog:8000, order:8080)
-  # Re-enable only after adding service containers or a staging environment secret
+  # push/pull_request disabled — api-tests and flow-tests require live services
+  # at localhost:8083 (basket), localhost:8000 (catalog), localhost:8080 (order)
+  # which do not exist in GitHub Actions CI; re-enable after adding service containers
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
 
 jobs:
   api-tests:
