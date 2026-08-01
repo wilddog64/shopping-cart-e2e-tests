@@ -1,5 +1,7 @@
 # Progress: Shopping Cart E2E Tests
 
+- [x] **Stripe checkout orchestrator e2e COMPLETE `680762a` on `origin/feat/stripe-checkout-e2e` (2026-08-01).** Added the contract, empty-cart, and env-gated Stripe happy/declined flows plus the two `.env.example` entries. `npx playwright test --list` passed; repo-wide `tsc`/`lint` are red only on pre-existing unrelated files and missing ESLint config, intentionally not changed.
+
 ## What's Built
 
 ### Project Infrastructure
