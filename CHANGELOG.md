@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Stripe checkout orchestrator end-to-end test (Stripe checkout Phase F): an env-gated (`OAUTH2_ENABLED=true STRIPE_E2E=true`) Playwright flow covering authenticated login → cart → Stripe Elements card entry → order orchestration → order PAID, validating the full A–E checkout path against a live test-mode stack. Also tracks the pre-existing tsc/lint baseline debt. Spec: `docs/plans/` Phase F Stripe checkout orchestrator e2e.
 - `.githooks/pre-push`: pre-push hook to block accidental direct pushes from feature branches to main; bypass with `ALLOW_MAIN_PUSH=1`
 
 ### Changed
