@@ -1,5 +1,9 @@
 # Active Context: Shopping Cart E2E Tests
 
+## Latest completed task
+
+- **Stripe checkout orchestrator e2e COMPLETE `680762a` on `origin/feat/stripe-checkout-e2e` (2026-08-01).** Added the env-gated OAuth2/Stripe flow and `PAYMENT_URL`/`STRIPE_E2E` documentation. The new file lists cleanly; repo-wide `tsc` and `lint` remain red on pre-existing unrelated files/config gaps and were intentionally left out of scope.
+
 ## Current State
 
 The E2E test suite is fully implemented with both API-level and flow-level test coverage across all backend services. The suite is operational and runs in CI on a daily schedule.
