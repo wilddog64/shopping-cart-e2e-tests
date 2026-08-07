@@ -30,14 +30,18 @@ export async function getAuthToken(request: APIRequestContext): Promise<string |
   const tokenUrl = `${authConfig.keycloakUrl}/realms/${authConfig.realm}/protocol/openid-connect/token`
 
   try {
+    const form = new URLSearchParams({
+      grant_type: 'password',
+      client_id: authConfig.clientId,
+      username: authConfig.testUsername,
+      password: authConfig.testPassword,
+    })
+    if (authConfig.clientSecret) {
+      form.set('client_secret', authConfig.clientSecret)
+    }
     const response = await request.post(tokenUrl, {
-      form: {
-        grant_type: 'password',
-        client_id: authConfig.clientId,
-        client_secret: authConfig.clientSecret,
-        username: authConfig.testUsername,
-        password: authConfig.testPassword,
-      },
+      data: form.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     })
 
     if (!response.ok()) {
