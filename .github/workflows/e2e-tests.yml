@@ -11,6 +11,24 @@ on:
         options:
           - staging
           - production
+  workflow_call:
+    inputs:
+      basket_url:
+        type: string
+        required: false
+        default: ''
+      product_catalog_url:
+        type: string
+        required: false
+        default: ''
+      order_url:
+        type: string
+        required: false
+        default: ''
+      oauth2_enabled:
+        type: string
+        required: false
+        default: 'false'
   # schedule disabled — re-enable once ImagePullBackOff resolved and app cluster healthy
   # schedule:
   #   - cron: '0 6 * * *'
@@ -46,10 +64,10 @@ jobs:
       - name: Run API tests
         run: npx playwright test --project=api
         env:
-          PRODUCT_CATALOG_URL: ${{ vars.PRODUCT_CATALOG_URL || 'http://localhost:8000' }}
-          BASKET_URL: ${{ vars.BASKET_URL || 'http://localhost:8083' }}
-          ORDER_URL: ${{ vars.ORDER_URL || 'http://localhost:8080' }}
-          OAUTH2_ENABLED: 'false'
+          PRODUCT_CATALOG_URL: ${{ inputs.product_catalog_url || vars.PRODUCT_CATALOG_URL || 'http://localhost:8000' }}
+          BASKET_URL: ${{ inputs.basket_url || vars.BASKET_URL || 'http://localhost:8083' }}
+          ORDER_URL: ${{ inputs.order_url || vars.ORDER_URL || 'http://localhost:8080' }}
+          OAUTH2_ENABLED: ${{ inputs.oauth2_enabled || 'false' }}
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -86,10 +104,10 @@ jobs:
       - name: Run flow tests
         run: npx playwright test --project=flows
         env:
-          PRODUCT_CATALOG_URL: ${{ vars.PRODUCT_CATALOG_URL || 'http://localhost:8000' }}
-          BASKET_URL: ${{ vars.BASKET_URL || 'http://localhost:8083' }}
-          ORDER_URL: ${{ vars.ORDER_URL || 'http://localhost:8080' }}
-          OAUTH2_ENABLED: 'false'
+          PRODUCT_CATALOG_URL: ${{ inputs.product_catalog_url || vars.PRODUCT_CATALOG_URL || 'http://localhost:8000' }}
+          BASKET_URL: ${{ inputs.basket_url || vars.BASKET_URL || 'http://localhost:8083' }}
+          ORDER_URL: ${{ inputs.order_url || vars.ORDER_URL || 'http://localhost:8080' }}
+          OAUTH2_ENABLED: ${{ inputs.oauth2_enabled || 'false' }}
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -126,10 +144,10 @@ jobs:
       - name: Run all tests
         run: npx playwright test
         env:
-          PRODUCT_CATALOG_URL: ${{ vars.PRODUCT_CATALOG_URL || 'http://localhost:8000' }}
-          BASKET_URL: ${{ vars.BASKET_URL || 'http://localhost:8083' }}
-          ORDER_URL: ${{ vars.ORDER_URL || 'http://localhost:8080' }}
-          OAUTH2_ENABLED: 'false'
+          PRODUCT_CATALOG_URL: ${{ inputs.product_catalog_url || vars.PRODUCT_CATALOG_URL || 'http://localhost:8000' }}
+          BASKET_URL: ${{ inputs.basket_url || vars.BASKET_URL || 'http://localhost:8083' }}
+          ORDER_URL: ${{ inputs.order_url || vars.ORDER_URL || 'http://localhost:8080' }}
+          OAUTH2_ENABLED: ${{ inputs.oauth2_enabled || 'false' }}
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
