@@ -96,7 +96,7 @@ export interface CreateOrderRequest {
 export interface Order {
   id: string
   customerId: string
-  status: 'PENDING' | 'PAID' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED'
+  status: 'PENDING' | 'PAID' | 'PROCESSING' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED'
   items: OrderItem[]
   totalAmount: number
   currency: string
@@ -142,14 +142,16 @@ export class ProductCatalogClient {
     const response = await this.request.post(`${this.baseUrl}/api/products`, {
       data,
     })
-    return responseData<Product>(response)
+    const product = await responseData<Product>(response)
+    return { ...product, price: Number(product.price), quantity: Number(product.quantity) }
   }
 
   async updateProduct(id: string, data: Partial<Product>): Promise<Product> {
     const response = await this.request.patch(`${this.baseUrl}/api/products/${id}`, {
       data,
     })
-    return responseData<Product>(response)
+    const product = await responseData<Product>(response)
+    return { ...product, price: Number(product.price), quantity: Number(product.quantity) }
   }
 
   async deleteProduct(id: string): Promise<void> {
