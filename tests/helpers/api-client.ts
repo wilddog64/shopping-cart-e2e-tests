@@ -9,6 +9,12 @@ export const config = {
   testUserId: process.env.TEST_USER_ID || 'e2e-test-user',
 }
 
+/** API services may wrap successful responses in { data, success } envelopes. */
+async function responseData<T>(response: Awaited<ReturnType<APIRequestContext['get']>>): Promise<T> {
+  const body = await response.json()
+  return (body && typeof body === 'object' && 'data' in body ? body.data : body) as T
+}
+
 // Types
 export interface Product {
   id: string
@@ -90,7 +96,7 @@ export interface CreateOrderRequest {
 export interface Order {
   id: string
   customerId: string
-  status: 'PENDING' | 'PAID' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED'
+  status: 'PENDING' | 'PAID' | 'PROCESSING' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED'
   items: OrderItem[]
   totalAmount: number
   currency: string
@@ -122,26 +128,30 @@ export class ProductCatalogClient {
 
     const url = `${this.baseUrl}/api/products${searchParams.toString() ? '?' + searchParams.toString() : ''}`
     const response = await this.request.get(url)
-    return response.json()
+    const result = await responseData<ProductListResponse>(response)
+    return { ...result, items: result.items.map((product) => ({ ...product, price: Number(product.price), quantity: Number(product.quantity) })) }
   }
 
   async getProduct(id: string): Promise<Product> {
     const response = await this.request.get(`${this.baseUrl}/api/products/${id}`)
-    return response.json()
+    const product = await responseData<Product>(response)
+    return { ...product, price: Number(product.price), quantity: Number(product.quantity) }
   }
 
   async createProduct(data: Partial<Product>): Promise<Product> {
     const response = await this.request.post(`${this.baseUrl}/api/products`, {
       data,
     })
-    return response.json()
+    const product = await responseData<Product>(response)
+    return { ...product, price: Number(product.price), quantity: Number(product.quantity) }
   }
 
   async updateProduct(id: string, data: Partial<Product>): Promise<Product> {
     const response = await this.request.patch(`${this.baseUrl}/api/products/${id}`, {
       data,
     })
-    return response.json()
+    const product = await responseData<Product>(response)
+    return { ...product, price: Number(product.price), quantity: Number(product.quantity) }
   }
 
   async deleteProduct(id: string): Promise<void> {
@@ -150,7 +160,7 @@ export class ProductCatalogClient {
 
   async checkHealth(): Promise<{ status: string }> {
     const response = await this.request.get(`${this.baseUrl}/health`)
-    return response.json()
+    return responseData<{ status: string }>(response)
   }
 }
 
@@ -172,7 +182,7 @@ export class BasketClient {
     const response = await this.request.get(`${this.baseUrl}/api/v1/cart`, {
       headers: this.getHeaders(),
     })
-    return response.json()
+    return responseData<Cart>(response)
   }
 
   async addItem(item: AddItemRequest): Promise<Cart> {
@@ -180,7 +190,7 @@ export class BasketClient {
       headers: this.getHeaders(),
       data: item,
     })
-    return response.json()
+    return responseData<Cart>(response)
   }
 
   async updateItem(itemId: string, data: UpdateItemRequest): Promise<Cart> {
@@ -188,14 +198,14 @@ export class BasketClient {
       headers: this.getHeaders(),
       data,
     })
-    return response.json()
+    return responseData<Cart>(response)
   }
 
   async removeItem(itemId: string): Promise<Cart> {
     const response = await this.request.delete(`${this.baseUrl}/api/v1/cart/items/${itemId}`, {
       headers: this.getHeaders(),
     })
-    return response.json()
+    return responseData<Cart>(response)
   }
 
   async clearCart(): Promise<void> {
@@ -209,12 +219,12 @@ export class BasketClient {
       headers: this.getHeaders(),
       data: { shippingAddress },
     })
-    return response.json()
+    return responseData<Cart>(response)
   }
 
   async checkHealth(): Promise<{ status: string }> {
     const response = await this.request.get(`${this.baseUrl}/health`)
-    return response.json()
+    return responseData<{ status: string }>(response)
   }
 }
 
@@ -238,21 +248,21 @@ export class OrderClient {
       headers: this.getHeaders(),
       data,
     })
-    return response.json()
+    return responseData<Order>(response)
   }
 
   async getOrder(orderId: string): Promise<Order> {
     const response = await this.request.get(`${this.baseUrl}/api/orders/${orderId}`, {
       headers: this.getHeaders(),
     })
-    return response.json()
+    return responseData<Order>(response)
   }
 
   async getOrdersByCustomer(customerId: string): Promise<Order[]> {
     const response = await this.request.get(`${this.baseUrl}/api/orders?customerId=${customerId}`, {
       headers: this.getHeaders(),
     })
-    return response.json()
+    return responseData<Order[]>(response)
   }
 
   async updateOrderStatus(orderId: string, status: string): Promise<Order> {
@@ -260,7 +270,7 @@ export class OrderClient {
       headers: this.getHeaders(),
       data: { status },
     })
-    return response.json()
+    return responseData<Order>(response)
   }
 
   async cancelOrder(orderId: string, reason?: string): Promise<Order> {
@@ -268,12 +278,12 @@ export class OrderClient {
       headers: this.getHeaders(),
       data: { reason: reason || 'E2E test cancellation' },
     })
-    return response.json()
+    return responseData<Order>(response)
   }
 
   async checkHealth(): Promise<{ status: string }> {
     const response = await this.request.get(`${this.baseUrl}/actuator/health`)
-    return response.json()
+    return responseData<{ status: string }>(response)
   }
 }
 
@@ -345,21 +355,21 @@ export class PaymentClient {
       headers: this.getHeaders(),
       data,
     })
-    return response.json()
+    return responseData<Payment>(response)
   }
 
   async getPayment(paymentId: string): Promise<Payment> {
     const response = await this.request.get(`${this.baseUrl}/api/payments/${paymentId}`, {
       headers: this.getHeaders(),
     })
-    return response.json()
+    return responseData<Payment>(response)
   }
 
   async getPaymentByOrderId(orderId: string): Promise<Payment | null> {
     const response = await this.request.get(`${this.baseUrl}/api/payments?orderId=${orderId}`, {
       headers: this.getHeaders(),
     })
-    const payments = await response.json()
+    const payments = await responseData<Payment[]>(response)
     return payments.length > 0 ? payments[0] : null
   }
 
@@ -367,7 +377,7 @@ export class PaymentClient {
     const response = await this.request.get(`${this.baseUrl}/api/payments?customerId=${customerId}`, {
       headers: this.getHeaders(),
     })
-    return response.json()
+    return responseData<Payment[]>(response)
   }
 
   async refundPayment(paymentId: string, data: RefundRequest): Promise<Refund> {
@@ -375,11 +385,11 @@ export class PaymentClient {
       headers: this.getHeaders(),
       data,
     })
-    return response.json()
+    return responseData<Refund>(response)
   }
 
   async checkHealth(): Promise<{ status: string }> {
     const response = await this.request.get(`${this.baseUrl}/actuator/health`)
-    return response.json()
+    return responseData<{ status: string }>(response)
   }
 }

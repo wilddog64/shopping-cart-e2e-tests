@@ -146,7 +146,7 @@ test.describe('Order API', () => {
   })
 
   test.describe('Update Order Status', () => {
-    test('should update order status to CONFIRMED', async () => {
+    test('should update order status to PAID', async () => {
       // Create order
       const items = [
         { productId: 'prod-123', name: testProducts.laptop.name, quantity: 1, unitPrice: testProducts.laptop.price },
@@ -154,9 +154,9 @@ test.describe('Order API', () => {
       const order = await client.createOrder(createOrderRequest(testUserId, items))
 
       // Update status
-      const updatedOrder = await client.updateOrderStatus(order.id, 'CONFIRMED')
+      const updatedOrder = await client.updateOrderStatus(order.id, 'PAID')
 
-      expect(updatedOrder.status).toBe('CONFIRMED')
+      expect(updatedOrder.status).toBe('PAID')
       expect(updatedOrder.updatedAt).toBeDefined()
     })
 
@@ -167,8 +167,9 @@ test.describe('Order API', () => {
       ]
       const order = await client.createOrder(createOrderRequest(testUserId, items))
 
-      // Update status multiple times
-      await client.updateOrderStatus(order.id, 'CONFIRMED')
+      // Update status multiple times (legal transition chain)
+      await client.updateOrderStatus(order.id, 'PAID')
+      await client.updateOrderStatus(order.id, 'PROCESSING')
       const finalOrder = await client.updateOrderStatus(order.id, 'SHIPPED')
 
       expect(finalOrder.status).toBe('SHIPPED')
@@ -195,7 +196,8 @@ test.describe('Order API', () => {
         { productId: 'prod-123', name: testProducts.laptop.name, quantity: 1, unitPrice: testProducts.laptop.price },
       ]
       const order = await client.createOrder(createOrderRequest(testUserId, items))
-      await client.updateOrderStatus(order.id, 'CONFIRMED')
+      await client.updateOrderStatus(order.id, 'PAID')
+      await client.updateOrderStatus(order.id, 'PROCESSING')
       await client.updateOrderStatus(order.id, 'SHIPPED')
 
       // Try to cancel - should fail
