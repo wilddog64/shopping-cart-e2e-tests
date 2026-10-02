@@ -56,11 +56,11 @@ export async function mintToken(request: APIRequestContext): Promise<string> {
   try {
     data = JSON.parse(bodyText) as { access_token?: string; expires_in?: number }
   } catch {
-    throw new Error(`Keycloak token request failed: ${response.status()} ${bodyText}`)
+    throw new Error(`Keycloak token response is not valid JSON (HTTP ${response.status()}): ${bodyText}`)
   }
 
   if (!data.access_token) {
-    throw new Error(`Keycloak token request failed: ${response.status()} ${bodyText}`)
+    throw new Error(`Keycloak token response has no access_token (HTTP ${response.status()}): ${bodyText}`)
   }
 
   const expiresIn = data.expires_in || 300
