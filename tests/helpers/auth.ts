@@ -22,42 +22,54 @@ export async function getAuthToken(request: APIRequestContext): Promise<string |
     return null
   }
 
-  // Check cached token
+  try {
+    return await mintToken(request)
+  } catch (error) {
+    console.error('Error getting auth token:', error)
+    return null
+  }
+}
+
+/** Get a Keycloak token for callers that require real OAuth2 authentication. */
+export async function mintToken(request: APIRequestContext): Promise<string> {
   if (cachedToken && cachedToken.expiresAt > Date.now()) {
     return cachedToken.token
   }
 
   const tokenUrl = `${authConfig.keycloakUrl}/realms/${authConfig.realm}/protocol/openid-connect/token`
+  const response = await request.post(tokenUrl, {
+    form: {
+      grant_type: 'password',
+      client_id: authConfig.clientId,
+      client_secret: authConfig.clientSecret,
+      username: authConfig.testUsername,
+      password: authConfig.testPassword,
+    },
+  })
+  const bodyText = await response.text()
 
-  try {
-    const response = await request.post(tokenUrl, {
-      form: {
-        grant_type: 'password',
-        client_id: authConfig.clientId,
-        client_secret: authConfig.clientSecret,
-        username: authConfig.testUsername,
-        password: authConfig.testPassword,
-      },
-    })
-
-    if (!response.ok()) {
-      console.error('Failed to get auth token:', await response.text())
-      return null
-    }
-
-    const data = await response.json()
-    const expiresIn = data.expires_in || 300 // Default 5 minutes
-
-    cachedToken = {
-      token: data.access_token,
-      expiresAt: Date.now() + (expiresIn - 30) * 1000, // Refresh 30s before expiry
-    }
-
-    return cachedToken.token
-  } catch (error) {
-    console.error('Error getting auth token:', error)
-    return null
+  if (!response.ok()) {
+    throw new Error(`Keycloak token request failed: ${response.status()} ${bodyText}`)
   }
+
+  let data: { access_token?: string; expires_in?: number }
+  try {
+    data = JSON.parse(bodyText) as { access_token?: string; expires_in?: number }
+  } catch {
+    throw new Error(`Keycloak token response is not valid JSON (HTTP ${response.status()}): ${bodyText}`)
+  }
+
+  if (!data.access_token) {
+    throw new Error(`Keycloak token response has no access_token (HTTP ${response.status()}): ${bodyText}`)
+  }
+
+  const expiresIn = data.expires_in || 300
+  cachedToken = {
+    token: data.access_token,
+    expiresAt: Date.now() + (expiresIn - 30) * 1000,
+  }
+
+  return cachedToken.token
 }
 
 /**

@@ -1,4 +1,5 @@
 import { APIRequestContext } from '@playwright/test'
+import { mintToken } from './auth'
 
 // Environment configuration
 export const config = {
@@ -11,6 +12,9 @@ export const config = {
 
 /** API services may wrap successful responses in { data, success } envelopes. */
 async function responseData<T>(response: Awaited<ReturnType<APIRequestContext['get']>>): Promise<T> {
+  if (!response.ok()) {
+    throw new Error(`HTTP ${response.status()} ${response.url()}: ${(await response.text()).slice(0, 500)}`)
+  }
   const body = await response.json()
   return (body && typeof body === 'object' && 'data' in body ? body.data : body) as T
 }
@@ -343,46 +347,49 @@ export class PaymentClient {
     private userId: string = config.testUserId
   ) {}
 
-  private getHeaders() {
+  private async getHeaders() {
     return {
       'X-User-ID': this.userId,
       'X-Correlation-ID': `e2e-${Date.now()}`,
+      Authorization: `Bearer ${await mintToken(this.request)}`,
     }
   }
 
   async processPayment(data: ProcessPaymentRequest): Promise<Payment> {
-    const response = await this.request.post(`${this.baseUrl}/api/payments`, {
-      headers: this.getHeaders(),
+    const response = await this.request.post(`${this.baseUrl}/api/v1/payments`, {
+      headers: await this.getHeaders(),
       data,
     })
     return responseData<Payment>(response)
   }
 
   async getPayment(paymentId: string): Promise<Payment> {
-    const response = await this.request.get(`${this.baseUrl}/api/payments/${paymentId}`, {
-      headers: this.getHeaders(),
+    const response = await this.request.get(`${this.baseUrl}/api/v1/payments/${paymentId}`, {
+      headers: await this.getHeaders(),
     })
     return responseData<Payment>(response)
   }
 
   async getPaymentByOrderId(orderId: string): Promise<Payment | null> {
-    const response = await this.request.get(`${this.baseUrl}/api/payments?orderId=${orderId}`, {
-      headers: this.getHeaders(),
+    const response = await this.request.get(`${this.baseUrl}/api/v1/payments/order/${orderId}`, {
+      headers: await this.getHeaders(),
     })
-    const payments = await responseData<Payment[]>(response)
-    return payments.length > 0 ? payments[0] : null
+    if (response.status() === 404) {
+      return null
+    }
+    return responseData<Payment>(response)
   }
 
   async getPaymentsByCustomer(customerId: string): Promise<Payment[]> {
-    const response = await this.request.get(`${this.baseUrl}/api/payments?customerId=${customerId}`, {
-      headers: this.getHeaders(),
+    const response = await this.request.get(`${this.baseUrl}/api/v1/payments/customer/${customerId}`, {
+      headers: await this.getHeaders(),
     })
     return responseData<Payment[]>(response)
   }
 
   async refundPayment(paymentId: string, data: RefundRequest): Promise<Refund> {
-    const response = await this.request.post(`${this.baseUrl}/api/payments/${paymentId}/refund`, {
-      headers: this.getHeaders(),
+    const response = await this.request.post(`${this.baseUrl}/api/v1/payments/${paymentId}/refund`, {
+      headers: await this.getHeaders(),
       data,
     })
     return responseData<Refund>(response)
