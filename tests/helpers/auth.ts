@@ -38,6 +38,7 @@ export async function mintToken(request: APIRequestContext): Promise<string> {
 
   const tokenUrl = `${authConfig.keycloakUrl}/realms/${authConfig.realm}/protocol/openid-connect/token`
   const response = await request.post(tokenUrl, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     form: {
       grant_type: 'password',
       client_id: authConfig.clientId,
