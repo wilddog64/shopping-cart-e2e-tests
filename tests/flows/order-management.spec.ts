@@ -52,17 +52,20 @@ test.describe('Order Management Flow', () => {
       const order = await createTestOrder()
       expect(order.status).toBe('PENDING')
 
-      // Confirm order
-      const confirmedOrder = await orderClient.updateOrderStatus(order.id, 'CONFIRMED')
-      expect(confirmedOrder.status).toBe('CONFIRMED')
+      // Pay order
+      const confirmedOrder = await orderClient.updateOrderStatus(order.id, 'PAID')
+      expect(confirmedOrder.status).toBe('PAID')
+
+      // Process order
+      await orderClient.updateOrderStatus(order.id, 'PROCESSING')
 
       // Ship order
       const shippedOrder = await orderClient.updateOrderStatus(order.id, 'SHIPPED')
       expect(shippedOrder.status).toBe('SHIPPED')
 
-      // Deliver order
-      const deliveredOrder = await orderClient.updateOrderStatus(order.id, 'DELIVERED')
-      expect(deliveredOrder.status).toBe('DELIVERED')
+      // Complete order
+      const deliveredOrder = await orderClient.updateOrderStatus(order.id, 'COMPLETED')
+      expect(deliveredOrder.status).toBe('COMPLETED')
     })
 
     test('should track status update timestamps', async () => {
@@ -72,7 +75,7 @@ test.describe('Order Management Flow', () => {
       // Small delay to ensure time difference
       await new Promise((resolve) => setTimeout(resolve, 100))
 
-      const updatedOrder = await orderClient.updateOrderStatus(order.id, 'CONFIRMED')
+      const updatedOrder = await orderClient.updateOrderStatus(order.id, 'PAID')
 
       expect(updatedOrder.updatedAt).toBeDefined()
       const updatedAt = new Date(updatedOrder.updatedAt)
@@ -85,7 +88,8 @@ test.describe('Order Management Flow', () => {
       const originalItemCount = order.items.length
 
       // Update status multiple times
-      await orderClient.updateOrderStatus(order.id, 'CONFIRMED')
+      await orderClient.updateOrderStatus(order.id, 'PAID')
+      await orderClient.updateOrderStatus(order.id, 'PROCESSING')
       await orderClient.updateOrderStatus(order.id, 'SHIPPED')
 
       // Retrieve and verify
@@ -105,9 +109,9 @@ test.describe('Order Management Flow', () => {
       expect(cancelledOrder.status).toBe('CANCELLED')
     })
 
-    test('should cancel confirmed order', async () => {
+    test('should cancel paid order', async () => {
       const order = await createTestOrder()
-      await orderClient.updateOrderStatus(order.id, 'CONFIRMED')
+      await orderClient.updateOrderStatus(order.id, 'PAID')
 
       const cancelledOrder = await orderClient.cancelOrder(order.id, 'Out of stock')
       expect(cancelledOrder.status).toBe('CANCELLED')
@@ -115,7 +119,8 @@ test.describe('Order Management Flow', () => {
 
     test('should not cancel shipped order', async () => {
       const order = await createTestOrder()
-      await orderClient.updateOrderStatus(order.id, 'CONFIRMED')
+      await orderClient.updateOrderStatus(order.id, 'PAID')
+      await orderClient.updateOrderStatus(order.id, 'PROCESSING')
       await orderClient.updateOrderStatus(order.id, 'SHIPPED')
 
       try {
@@ -132,11 +137,12 @@ test.describe('Order Management Flow', () => {
       expect(unchangedOrder.status).toBe('SHIPPED')
     })
 
-    test('should not cancel delivered order', async () => {
+    test('should not cancel completed order', async () => {
       const order = await createTestOrder()
-      await orderClient.updateOrderStatus(order.id, 'CONFIRMED')
+      await orderClient.updateOrderStatus(order.id, 'PAID')
+      await orderClient.updateOrderStatus(order.id, 'PROCESSING')
       await orderClient.updateOrderStatus(order.id, 'SHIPPED')
-      await orderClient.updateOrderStatus(order.id, 'DELIVERED')
+      await orderClient.updateOrderStatus(order.id, 'COMPLETED')
 
       try {
         await orderClient.cancelOrder(order.id, 'Want refund')
@@ -144,6 +150,9 @@ test.describe('Order Management Flow', () => {
       } catch (error) {
         expect(error).toBeDefined()
       }
+
+      const unchangedOrder = await orderClient.getOrder(order.id)
+      expect(unchangedOrder.status).toBe('COMPLETED')
     })
   })
 
@@ -295,7 +304,7 @@ test.describe('Order Management Flow', () => {
       const pendingOrder = await createTestOrder()
 
       const confirmedOrder = await createTestOrder()
-      await orderClient.updateOrderStatus(confirmedOrder.id, 'CONFIRMED')
+      await orderClient.updateOrderStatus(confirmedOrder.id, 'PAID')
 
       const cancelledOrder = await createTestOrder()
       await orderClient.cancelOrder(cancelledOrder.id, 'Test')
@@ -306,7 +315,7 @@ test.describe('Order Management Flow', () => {
       // Verify different statuses exist
       const statuses = orders.map((o: { status: string }) => o.status)
       expect(statuses).toContain('PENDING')
-      expect(statuses).toContain('CONFIRMED')
+      expect(statuses).toContain('PAID')
       expect(statuses).toContain('CANCELLED')
     })
   })
@@ -361,7 +370,8 @@ test.describe('Order Management Flow', () => {
       const order = await createTestOrder()
 
       // Rapid updates
-      await orderClient.updateOrderStatus(order.id, 'CONFIRMED')
+      await orderClient.updateOrderStatus(order.id, 'PAID')
+      await orderClient.updateOrderStatus(order.id, 'PROCESSING')
       await orderClient.updateOrderStatus(order.id, 'SHIPPED')
 
       const finalOrder = await orderClient.getOrder(order.id)
