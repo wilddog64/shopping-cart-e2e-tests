@@ -15,5 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgrade Node.js 20 → 22 (NODE_VERSION env var in e2e-tests.yml)
 
 ### Fixed
+- **Stripe checkout flow reads the payments-by-order response correctly.**
+  `GET /api/v1/payments/order/{orderId}` returns a single payment object, not a list. The flow
+  treated the object as an empty list, so it failed "records a stripe payment" after a checkout that
+  had succeeded. It now wraps a single object, and still accepts an array or a `{data: [...]}` body.
 - `tests/flows/order-management.spec.ts` used order statuses the Go order service does not have (`CONFIRMED`, `DELIVERED`), so 8 flow tests got `400 "status is required"`. They now follow the service's state machine: `PENDING → PAID → PROCESSING → SHIPPED → COMPLETED`, with cancels only from states that allow them. "should not cancel completed order" now also checks the status is unchanged.
 - Disabled `push` and `pull_request` triggers from `e2e-tests.yml` — API and flow test jobs require live services at localhost:8083/8000/8080 which do not exist in CI
